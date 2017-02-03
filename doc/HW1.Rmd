@@ -1,8 +1,8 @@
 ---
-title: "Tutorial (week 2) B: text mining"
-output: html_notebook
-    toc: true
-    toc_depth: 2
+title: "The inaugaration speeches during the Great Depression and the 2007-2008 financial crisis"
+output:
+  html_document: default
+  html_notebook: default
 ---
 The Great Depression (1929-39) was the deepest and longest-lasting economic downturn in the history of the Western industrialized world. In the United States, the Great Depression began soon after the stock market crash of October 1929, which sent Wall Street into a panic and wiped out millions of investors. Herbert Hoover was the president at that time. Over the next several years, consumer spending and investment dropped, causing steep declines in industrial output and rising levels of unemployment as failing companies laid off workers. By 1933, when the Great Depression reached its nadir, some 13 to 15 million Americans were unemployed and nearly half of the country’s banks had failed. Though the relief and reform measures put into place by President Franklin D. Roosevelt helped lessen the worst effects of the Great Depression in the 1930s, the economy would not fully turn around until after 1939, when World War II kicked American industry into high gear.
 
@@ -19,6 +19,7 @@ Some people think George W. Bush fixed the financial crisis while some think he 
 # Step 0: check and install needed packages. Load the libraries and functions. 
 
 ```{r, message=FALSE, warning=FALSE}
+getwd()
 packages.used=c("rvest", "tibble", "qdap", 
                 "sentimentr", "gplots", "dplyr",
                 "tm", "syuzhet", "factoextra", 
@@ -118,10 +119,6 @@ for(i in seq(nrow(speech.list))) {
   cat(text)  # write the file
   sink() # close the file
 }
-```
-
-```{r}
-
 ```
 
 
