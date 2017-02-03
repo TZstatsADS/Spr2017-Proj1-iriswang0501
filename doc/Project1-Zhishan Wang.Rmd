@@ -1,0 +1,677 @@
+---
+title: The inauguration speeches during the Great Depression and the 2007-2008 financial crisis
+output:
+  html_notebook: default
+  html_document: default
+---
+
+
+The Great Depression (1929-39) was the deepest and longest-lasting economic downturn in the history of the Western industrialized world. In the United States, the Great Depression began soon after the stock market crash of October 1929, which sent Wall Street into a panic and wiped out millions of investors. Herbert Hoover was the president at that time. 
+<center>![](https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/President_Hoover_portrait.tif/lossy-page1-248px-President_Hoover_portrait.tif.jpg)</center>
+Over the next several years, consumer spending and investment dropped, causing steep declines in industrial output and rising levels of unemployment as failing companies laid off workers. By 1933, when the Great Depression reached its nadir, some 13 to 15 million Americans were unemployed and nearly half of the country’s banks had failed. Though the relief and reform measures put into place by President Franklin D. Roosevelt helped lessen the worst effects of the Great Depression in the 1930s, the economy would not fully turn around until after 1939, when World War II kicked American industry into high gear.
+<center>![](https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Franklin_D._Roosevelt_-_NARA_-_535943.jpg/330px-Franklin_D._Roosevelt_-_NARA_-_535943.jpg)</center>
+The financial crisis of 2007–2008, also known as the global financial crisis and the 2008 financial crisis, is considered by many economists to have been the worst financial crisis since the Great Depression of the 1930s. 
+It began in 2007 with a crisis in the subprime mortgage market in the USA, and developed into a full-blown international banking crisis with the collapse of the investment bank Lehman Brothers on September 15, 2008. Excessive risk taking by banks such as Lehman Brothers helped to magnify the financial impact globally. Massive bail-outs of financial institutions and other palliative monetary and fiscal policies were employed to prevent a possible collapse of the world's financial system. The crisis was nonetheless followed by a global economic downturn, the Great Recession. The Eurozone crisis, a crisis in the banking system of the European countries using the euro, followed later.
+<center>![](https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/George-W-Bush.jpeg/165px-George-W-Bush.jpeg)</center>
+Some people think George W. Bush fixed the financial crisis while some think he is one of the people to blame for. During the presidency of Barack Obama, the US revived and cleaned up its banking system. Europe, however, is still struggling to stabilize and regulate its banking system. 
+<center>![](https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/President_Barack_Obama.jpg/248px-President_Barack_Obama.jpg)</center>
+
+In this project we try to use text mining to analyze the inaugurations of these four presidents, to feel the different emotions in the speech and try to find the reflect of the time in the inaugurations.
+
+# Step 0: check and install needed packages. Load the libraries and functions. 
+
+```{r, message=FALSE, warning=FALSE}
+
+setwd("/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/doc")
+getwd()
+packages.used=c("rvest", "tibble", "qdap", 
+                "sentimentr", "gplots", "dplyr",
+                "tm", "syuzhet", "factoextra", 
+                "beeswarm", "scales", "RColorBrewer",
+                "RANN", "tm", "topicmodels")
+
+# check packages that need to be installed.
+packages.needed=setdiff(packages.used, 
+                        intersect(installed.packages()[,1], 
+                                  packages.used))
+# install additional packages
+if(length(packages.needed)>0){
+  install.packages(packages.needed, dependencies = TRUE)
+}
+
+# load packages
+library("rvest")
+library("tibble")
+library("qdap")
+library("sentimentr")
+library("gplots")
+library("dplyr")
+library("tm")
+library("syuzhet")
+library("factoextra")
+library("beeswarm")
+library("scales")
+library("RColorBrewer")
+library("RANN")
+library("tm")
+library("topicmodels")
+library("dplyr")
+library("tidytext")
+library("SnowballC")
+library("wordcloud")
+
+
+source("../lib/plotstacked.R")
+source("../lib/speechFuncs.R")
+```
+This notebook was prepared with the following environmental settings.
+
+```{r}
+print(R.version)
+```
+
+# Step 1: Data harvest: scrap speech URLs from <http://www.presidency.ucsb.edu/>.
+
+We used [Selectorgadget](http://selectorgadget.com/) to choose the links we would like to scrap. We selected all inaugural addresses of past presidents, and we only use the inaugurations of four presidents here.  
+
+```{r, message=FALSE, warning=FALSE}
+### Inauguaral speeches
+main.page <- read_html(x = "http://www.presidency.ucsb.edu/inaugurals.php")
+# Get link URLs
+# f.speechlinks is a function for extracting links from the list of speeches. 
+inaug=f.speechlinks(main.page)
+#head(inaug)
+as.Date(inaug[,1], format="%B %e, %Y")
+inaug=inaug[-nrow(inaug),] # remove the last line, irrelevant due to error.
+```
+
+# Step 2: Using speech metadata posted on <http://www.presidency.ucsb.edu/>, we prepared CSV data sets for the speeches we will scrap. 
+
+```{r}
+inaug.list=read.csv("/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/data/inauglist.csv", stringsAsFactors = FALSE)
+```
+
+We assemble all scrapped speeches into one list. Note here that we don't have the full text yet, only the links to full text transcripts. 
+
+# Step 3: scrap the texts of speeches from the speech URLs.
+
+```{r}
+speech.list=rbind(inaug.list, nomin.list, farewell.list)
+speech.list$type=c(rep("inaug", nrow(inaug.list)),
+                   rep("nomin", nrow(nomin.list)),
+                   rep("farewell", nrow(farewell.list)))
+speech.url=rbind(inaug, nomin, farewell)
+speech.list=cbind(speech.list, speech.url)
+```
+
+Based on the list of speeches, we scrap the main text part of the transcript's html page. For simple html pages of this kind,  [Selectorgadget](http://selectorgadget.com/) is very convenient for identifying the html node that `rvest` can use to scrap its content. For reproducibility, we also save our scrapped speeches into our local folder as individual speech files. 
+
+```{r}
+# Loop over each row in speech.list
+speech.list$fulltext=NA
+for(i in seq(nrow(speech.list))) {
+  text <- read_html(speech.list$urls[i]) %>% # load the page
+    html_nodes(".displaytext") %>% # isloate the text
+    html_text() # get the text
+  speech.list$fulltext[i]=text
+  # Create the file name
+  filename <- paste0("/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/data/fulltext/", 
+                     speech.list$type[i],
+                     speech.list$File[i], "-", 
+                     speech.list$Term[i], ".txt")
+  sink(file = filename) %>% # open file to write 
+  cat(text)  # write the file
+  sink() # close the file
+}
+```
+
+
+# Step 4: data Processing --- generate list of sentences
+
+We try to generate list od sentences for the following analysis. For each extracted sentence, we apply sentiment analysis using [NRC sentiment lexion]. "The NRC Emotion Lexicon is a list of English words and their associations with eight basic emotions (anger, fear, anticipation, trust, surprise, sadness, joy, and disgust) and two sentiments (negative and positive). The annotations were manually done by crowdsourcing."
+
+```{r, message=FALSE, warning=FALSE}
+sentence.list=NULL
+for(i in 1:nrow(speech.list)){
+  sentences=sent_detect(speech.list$fulltext[i],
+                        endmarks = c("?", ".", "!", "|",";"))
+  if(length(sentences)>0){
+    emotions=get_nrc_sentiment(sentences)
+    word.count=word_count(sentences)
+    # colnames(emotions)=paste0("emo.", colnames(emotions))
+    # in case the word counts are zeros?
+    emotions=diag(1/(word.count+0.01))%*%as.matrix(emotions)
+    sentence.list=rbind(sentence.list, 
+                        cbind(speech.list[i,-ncol(speech.list)],
+                              sentences=as.character(sentences), 
+                              word.count,
+                              emotions,
+                              sent.id=1:length(sentences)
+                              )
+    )
+  }
+}
+```
+
+Some non-sentences exist in raw data due to erroneous extra end-of sentence marks. 
+```{r}
+sentence.list=
+  sentence.list%>%
+  filter(!is.na(word.count)) 
+
+```
+
+# Step 5: Data analysis --- length of sentences
+
+For simpler visualization, we chose a subset of four presidents on which to focus our analysis. 
+
+```{r}
+sel.comparison=c( "HerbertHoover","FranklinDRoosevelt","GeorgeWBush", "BarackObama")
+```
+
+
+```{r, fig.width = 4.5, fig.height = 3}
+sentence.list.sel=sentence.list%>%filter(type=="inaug", File%in%sel.comparison, Term==1)
+sentence.list.sel$File=factor(sentence.list.sel$File)
+
+sentence.list.sel$FileOrdered=reorder(sentence.list.sel$File, 
+                                  sentence.list.sel$word.count, 
+                                  mean, 
+                                  order=T)
+par(mar=c(4, 11, 2, 2))
+
+beeswarm(word.count~FileOrdered, 
+         data=sentence.list.sel,
+         horizontal = TRUE,
+         pch=16, col=alpha(brewer.pal(9, "Set1"), 0.6), 
+         cex=0.55, cex.axis=0.8, cex.lab=0.8,
+         spacing=5/nlevels(sentence.list.sel$FileOrdered),
+         las=2, ylab="", xlab="Number of words in a sentence.",
+         main="Inaugural Speeches Term 1") 
+
+sentence.list.sel=sentence.list%>%filter(type=="inaug", File%in%sel.comparison, Term==2)
+sentence.list.sel$File=factor(sentence.list.sel$File)
+
+sentence.list.sel$FileOrdered=reorder(sentence.list.sel$File, 
+                                  sentence.list.sel$word.count, 
+                                  mean, 
+                                  order=T)
+par(mar=c(4, 11, 2, 2))
+
+beeswarm(word.count~FileOrdered, 
+         data=sentence.list.sel,
+         horizontal = TRUE,
+         pch=16, col=alpha(brewer.pal(9, "Set1"), 0.6), 
+         cex=0.55, cex.axis=0.8, cex.lab=0.8,
+         spacing=5/nlevels(sentence.list.sel$FileOrdered),
+         las=2, ylab="", xlab="Number of words in a sentence.",
+         main="Inaugural Speeches Term 2")
+```
+
+We assume that people in the same time tend to have more similiar speech habits. Then in Term 1 George W. Bush has more relatively short sentences than Barack Obama while Herbert Hoover and Franklin D. Roosevelt have relatively same length setences. But in the Term 2, we can see that Bush also have long sentences in his inauguration speech. That may be because 9.11 and he condemned the terrorism and build confidence of the nation to survive in the financial crisis. Sentences conveying these emotions are usually longer.
+
+Short sentences in inaugural speeches. 
+```{r}
+sentence.list%>%
+  filter(File=="HerbertHoover", 
+         type=="inaug", 
+         word.count<=3)%>%
+  select(sentences)
+
+sentence.list%>%
+  filter(File=="FranklinDRoosevelt", 
+         type=="inaug", 
+         word.count<=3)%>%
+  select(sentences)
+
+sentence.list%>%
+  filter(File=="GeorgeWBush", 
+         type=="inaug", 
+         word.count<=3)%>%
+  select(sentences)
+
+sentence.list%>%
+  filter(File=="BarackObama", 
+         type=="inaug", 
+         word.count<=3)%>%
+  select(sentences)
+```
+
+From the short sentences, we can clearly find the different emphasizes in each time. In Hoover's time, the country is not as safe as it is now. Safety is the priority people care about so the president mentioned that "Crime is increasing." to draw the attention of the people. While in Roosevelt's time, fighting the Great Depression was the most urgent thing, so Roosevelt stated a lot about what kinds of economy policies he would use to save the country. It is no wonder that he mentioned about tax in the speech. Obama's short sentences also tells a lot. Now US people live in a no war time and the influenc of the financial crisis is fading. After achieving the basic demand such as safety and food, people have higher level demand such as diversity and openness. From the big point, we are in a time that technolies blow out. Diversity and openness are key elements to attract the talent from all over the world. Obama was fully aware of that because he knew the value of talents. Also from the situation of US, in the preseiency of Obama, the government was respectful and supportive of L.G.B.T.Q. rights, which is a big step of the shole society.
+
+# Step 5: Data analysis --- sentiment analysis
+
+We try to get a direct impression of the cluster of emotions using the following graphs. 
+## Clustering of emotions
+```{r, fig.width=2, fig.height=2}
+sel.comparison=c( "HerbertHoover","FranklinDRoosevelt","GeorgeWBush", "BarackObama")
+my_palette <- colorRampPalette(c("red", "yellow", "green"))(n = 299)
+col_breaks = c(seq(-1,0,length=100),  # for red
+  seq(0.01,0.8,length=100),           # for yellow
+  seq(0.81,1,length=100))             # for green
+sentence.list=sentence.list%>%filter(type=="inaug", File%in%sel.comparison, Term==1)
+mat_data <- round(cor(sentence.list%>%filter(type=="inaug")%>%select(anger:trust)),2)
+heatmap.2(mat_data, notecol="black",
+          cellnote = mat_data,
+          scale = "none", 
+          col =my_palette , margin=c(6, 6), key=F,
+          trace = "none", density.info = "none", breaks=col_breaks,
+          notecex = 0.5)
+
+par(mar=c(6, 6, 6, 4))
+emo.means=colMeans(select(sentence.list%>%filter(type=="inaug", File=='HerbertHoover'), anger:trust)>0.01)
+col.use=c("red2", "darkgoldenrod1", 
+            "chartreuse3", "blueviolet",
+            "darkgoldenrod2", "dodgerblue3", 
+            "darkgoldenrod1", "darkgoldenrod1")
+barplot(emo.means[order(emo.means)], las=2, col=col.use[order(emo.means)], horiz=T, main="Inaugural Speeches of Herbert Hoover", cex.main = 1.1)
+
+par(mar=c(6, 6, 6, 4))
+emo.means=colMeans(select(sentence.list%>%filter(type=="inaug", File=="FranklinDRoosevelt"), anger:trust)>0.01)
+col.use=c("red2", "darkgoldenrod1", 
+            "chartreuse3", "blueviolet",
+            "darkgoldenrod2", "dodgerblue3", 
+            "darkgoldenrod1", "darkgoldenrod1")
+barplot(emo.means[order(emo.means)], las=2, col=col.use[order(emo.means)], horiz=T, main="Inaugural Speeches of Franklin D.Roosevelt", cex.main = 1)
+
+par(mar=c(6, 6, 6, 4))
+emo.means=colMeans(select(sentence.list%>%filter(type=="inaug", File=="GeorgeWBush"), anger:trust)>0.01)
+col.use=c("red2", "darkgoldenrod1", 
+            "chartreuse3", "blueviolet",
+            "darkgoldenrod2", "dodgerblue3", 
+            "darkgoldenrod1", "darkgoldenrod1")
+barplot(emo.means[order(emo.means)], las=2, col=col.use[order(emo.means)], horiz=T, main="Inaugural Speeches of George W.Bush", cex.main = 1.1)
+
+par(mar=c(6, 6, 6, 4))
+emo.means=colMeans(select(sentence.list%>%filter(type=="inaug", File=='BarackObama'), anger:trust)>0.01)
+col.use=c("red2", "darkgoldenrod1", 
+            "chartreuse3", "blueviolet",
+            "darkgoldenrod2", "dodgerblue3", 
+            "darkgoldenrod1", "darkgoldenrod1")
+barplot(emo.means[order(emo.means)], las=2, col=col.use[order(emo.means)], horiz=T, main="Inaugural Speeches of Barack Obama", cex.main = 1.1)
+```
+In the first heat map, Green stands for strong correlation while orange stands for weak correlation and the yellow is in the middle of green and orange. We assume correlation over 0.5 a relatively strong correlation. Among the inaugurations of the four presidents, fear and anger(0.57), disgust and anger(0.52), antipation and joy(0.7), joy and trust(0.58), antipation and trust(0.5) have strong bonds with each other. 
+
+Also in the four bar graphs which depict the emotions of the four presendents seperately, we can see that trust is the overwhelming No.1 emotion. In general, positive emotions are more than negative emotions. This accords with the fact the auguration is aim at enhancing morale and building confidence, at the mean time pointing the problems. 
+
+What's interesting is that the emotion "fear" is very strong in Roosevelt's and Obama's inauguration. In Roosevelt's speech, fear is even stonger than joy, in the third place. This can be explained that these two presidents were in the vortex of the economy collapse and fear is a prevailing emotion in that time. 
+
+We try to understand it in a real history context. When the stock market crashed in October 1929, President Herbert Hoover encouraged business leaders to take an interventionist approach to combat the impending economic emergency because “it is action that counts.” Over the next three years, however, Hoover worked unsuccessfully to mitigate the economic crisis of the Great Depression. Corporate welfare promises failed. State relief efforts dissipated. Not only was the federal government too small to handle the crisis, individuals and businesses across the political spectrum opposed federal intervention. Even then-governor of New York, Franklin Roosevelt, wrote privately, “I am very much opposed to the extension of Federal action in most economy social problems.” So when the Great Depression finally come, no wonder fear is the dominating feeling of the time.
+
+## Sentence length variation over the course of the speech, with emotions. 
+
+How the four presidents alternate between long and short sentences and how they shift between different sentiments in their speeches. It is interesting to note that some speeches are more colorful than others.
+```{r, fig.height=2.5, fig.width=2}
+par(mfrow=c(4,1), mar=c(1,0,2,0), bty="n", xaxt="n", yaxt="n", font.main=1)
+
+
+f.plotsent.len(In.list=sentence.list, InFile="HerbertHoover", 
+               InType="inaug", InTerm=1, President="Herbert Hoover")
+
+f.plotsent.len(In.list=sentence.list, InFile="FranklinDRoosevelt", 
+               InType="inaug", InTerm=1, President="Franklin D Roosevelt")
+
+f.plotsent.len(In.list=sentence.list, InFile="GeorgeWBush", 
+               InType="inaug", InTerm=1, President="George W. Bush")
+
+f.plotsent.len(In.list=sentence.list, InFile="BarackObama", 
+               InType="inaug", InTerm=1, President="Barack Obama")
+```
+We can find from the graphs:
+1. All the dominanting emotions are positive emotions, which is darkgoldenrod in the graph, even in the time fanancial situation is very dangerous. 
+2. Longer sentences usually convey positive emotions such as trust and anticipation. 
+3. All presidents know how to use long sentences and short sentences in turns to convey complicated emotions. The combination of long sentences and short sentences can make the speech more powerful.
+
+### What are the emotionally changed sentences?
+
+```{r}
+print("HerbertHoover")
+speech.df=tbl_df(sentence.list)%>%
+  filter(File=="HerbertHoover", type=="inaug", word.count>=4)%>%
+  select(sentences, anger:trust)
+speech.df=as.data.frame(speech.df)
+as.character(speech.df$sentences[apply(speech.df[,-1], 2, which.max)])
+
+print("FranklinDRoosevelt")
+speech.df=tbl_df(sentence.list)%>%
+  filter(File=="FranklinDRoosevelt", type=="inaug", Term==1, word.count>=5)%>%
+  select(sentences, anger:trust)
+speech.df=as.data.frame(speech.df)
+as.character(speech.df$sentences[apply(speech.df[,-1], 2, which.max)])
+
+print("George W Bush")
+speech.df=tbl_df(sentence.list)%>%
+  filter(File=="GeorgeWBush", type=="inaug", Term==1, word.count>=4)%>%
+  select(sentences, anger:trust)
+speech.df=as.data.frame(speech.df)
+as.character(speech.df$sentences[apply(speech.df[,-1], 2, which.max)])
+
+print("Barack Obama")
+speech.df=tbl_df(sentence.list)%>%
+  filter(File=="BarackObama", type=="inaug", Term==1, word.count>=5)%>%
+  select(sentences, anger:trust)
+speech.df=as.data.frame(speech.df)
+as.character(speech.df$sentences[apply(speech.df[,-1], 2, which.max)])
+
+
+```
+Just as we have mentioned above, every time has its theme. This can be shown clearly in the emotionally changed sentences of each president. 
+In Hoover's time, disease and criminal is the primary enemy. While in Roosevelt's time, words like "happiness", "money", "substance" reflect the society problem triggered by the weak economy. During Bush's presidency, though most of the emtionally changed sentences are meaningless, the sentence "Where there is suffering, there is duty." still reflects the fact of the society. Finally, in Obama's speech, the sentences usually aim at reaching a consensus and building confidence. 
+
+```{r}
+sentence.list
+```
+
+# Step 5: Data analysis --- Topic modeling
+
+For topic modeling, we try to find the common part in the different inaugurations. 
+
+```{r}
+corpus.list=sentence.list[2:(nrow(sentence.list)-1), ]
+sentence.pre=sentence.list$sentences[1:(nrow(sentence.list)-2)]
+sentence.post=sentence.list$sentences[3:(nrow(sentence.list)-1)]
+corpus.list$snipets=paste(sentence.pre, corpus.list$sentences, sentence.post, sep=" ")
+rm.rows=(1:nrow(corpus.list))[corpus.list$sent.id==1]
+rm.rows=c(rm.rows, rm.rows-1)
+corpus.list=corpus.list[-rm.rows, ]
+```
+
+## Text mining
+```{r}
+docs <- Corpus(VectorSource(corpus.list$snipets))
+writeLines(as.character(docs[[sample(1:nrow(corpus.list), 1)]]))
+```
+
+### Text basic processing
+
+```{r}
+#remove potentially problematic symbols
+docs <-tm_map(docs,content_transformer(tolower))
+writeLines(as.character(docs[[sample(1:nrow(corpus.list), 1)]]))
+
+#remove punctuation
+docs <- tm_map(docs, removePunctuation)
+writeLines(as.character(docs[[sample(1:nrow(corpus.list), 1)]]))
+
+#Strip digits
+docs <- tm_map(docs, removeNumbers)
+writeLines(as.character(docs[[sample(1:nrow(corpus.list), 1)]]))
+
+#remove stopwords
+docs <- tm_map(docs, removeWords, stopwords("english"))
+writeLines(as.character(docs[[sample(1:nrow(corpus.list), 1)]]))
+
+#remove whitespace
+docs <- tm_map(docs, stripWhitespace)
+writeLines(as.character(docs[[sample(1:nrow(corpus.list), 1)]]))
+
+#Stem document
+docs <- tm_map(docs,stemDocument)
+writeLines(as.character(docs[[sample(1:nrow(corpus.list), 1)]]))
+```
+
+### Topic modeling
+
+Gengerate document-term matrices. 
+
+```{r}
+library(tm)
+library(NLP)
+library(magrittr)
+dtm <- DocumentTermMatrix(docs)
+#convert rownames to filenames#convert rownames to filenames
+rownames(dtm) <- paste(corpus.list$type, corpus.list$File,
+                       corpus.list$Term, corpus.list$sent.id, sep="_")
+
+rowTotals <- apply(dtm , 1, sum) #Find the sum of words in each Document
+
+dtm  <- dtm[rowTotals> 0, ]
+corpus.list=corpus.list[rowTotals>0, ]
+
+```
+
+Run LDA
+
+```{r}
+#Set parameters for Gibbs sampling
+burnin <- 4000
+iter <- 2000
+thin <- 500
+seed <-list(2003,5,63,100001,765)
+nstart <- 5
+best <- TRUE
+
+#Number of topics
+k <- 15
+
+#Run LDA using Gibbs sampling
+ldaOut <-LDA(dtm, k, method="Gibbs", control=list(nstart=nstart, 
+                                                 seed = seed, best=best,
+                                                 burnin = burnin, iter = iter, 
+                                                 thin=thin))
+#write out results
+#docs to topics
+ldaOut.topics <- as.matrix(topics(ldaOut))
+table(c(1:k, ldaOut.topics))
+write.csv(ldaOut.topics,file=paste("/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/out/LDAGibbs",k,"DocsToTopics.csv"))
+
+#top 6 terms in each topic
+ldaOut.terms <- as.matrix(terms(ldaOut,20))
+write.csv(ldaOut.terms,file=paste("/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/out/LDAGibbs",k,"TopicsToTerms.csv"))
+
+#probabilities associated with each topic assignment
+topicProbabilities <- as.data.frame(ldaOut@gamma)
+write.csv(topicProbabilities,file=paste("/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/out/LDAGibbs",k,"TopicProbabilities.csv"))
+```
+```{r}
+terms.beta=ldaOut@beta
+terms.beta=scale(terms.beta)
+topics.terms=NULL
+for(i in 1:k){
+  topics.terms=rbind(topics.terms, ldaOut@terms[order(terms.beta[i,], decreasing = TRUE)[1:7]])
+}
+topics.terms
+ldaOut.terms
+```
+
+Based on the most popular terms and the most salient terms for each topic, we assign a hashtag to each topic. This part require manual setup as the topics are likely to change. 
+
+```{r}
+topics.hash=c("Economy", "America", "Defense", "Belief", "Election", "Patriotism", "Unity", "Government", "Reform", "Temporal", "WorkingFamilies", "Freedom", "Equality", "Misc", "Legislation")
+corpus.list$ldatopic=as.vector(ldaOut.topics)
+corpus.list$ldahash=topics.hash[ldaOut.topics]
+
+colnames(topicProbabilities)=topics.hash
+corpus.list.df=cbind(corpus.list, topicProbabilities)
+```
+
+## Clustering of topics
+```{r, fig.width=6, fig.height=4}
+
+par(mar=c(1,2,1,1))
+topic.summary=tbl_df(corpus.list.df)%>%
+              filter(type%in%c("nomin", "inaug"), File%in%sel.comparison)%>%
+              select(File, Economy:Legislation)%>%
+              group_by(File)%>%
+              summarise_each(funs(mean))
+topic.summary=as.data.frame(topic.summary)
+rownames(topic.summary)=topic.summary[,1]
+
+# [1] "Economy"         "America"         "Defense"         "Belief"         
+# [5] "Election"        "Patriotism"      "Unity"           "Government"     
+# [9] "Reform"          "Temporal"        "WorkingFamilies" "Freedom"        
+# [13] "Equality"        "Misc"            "Legislation"       
+
+topic.plot=c(1, 13, 9, 11, 8, 3, 7)
+print(topics.hash[topic.plot])
+
+heatmap.2(as.matrix(topic.summary[,topic.plot+1]), 
+          scale = "column", key=F, 
+          col = bluered(100),
+          cexRow = 0.9, cexCol = 0.9, margins = c(8, 8),
+          trace = "none", density.info = "none")
+```
+In the heatmap, red indicates higher correlation and blue indicates lower correlation (possibly negative values). It is obvious that President Hoover likes discussing Unity, Reform and Economy. President Roosevelt paid more attention to Government and Defenses. President Bush liked talking about Equality. President Obama did not have a preference towards the topics but he seemed to talk less about Defences compared to other presidents. Maybe it is because he is a president of peace time. 
+
+```{r, fig.width=3.3, fig.height=5}
+# [1] "Economy"         "America"         "Defense"         "Belief"         
+# [5] "Election"        "Patriotism"      "Unity"           "Government"     
+# [9] "Reform"          "Temporal"        "WorkingFamilies" "Freedom"        
+# [13] "Equality"        "Misc"            "Legislation"       
+ 
+
+par(mfrow=c(5, 1), mar=c(1,1,2,0), bty="n", xaxt="n", yaxt="n")
+
+library(hash)
+topic.plot=c(1, 13, 14, 15, 8, 9, 12)
+print(topics.hash[topic.plot])
+
+speech.df=tbl_df(corpus.list.df)%>%filter(File=="HerbertHoover", type=="inaug",Term==1)%>%select(sent.id, Economy:Legislation)
+speech.df=as.matrix(speech.df)
+speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+plot.stacked(speech.df[,1], speech.df[,topic.plot+1], 
+             xlab="Sentences", ylab="Topic share", main="HerbertHoover")
+
+speech.df=tbl_df(corpus.list.df)%>%filter(File=="FranklinDRoosevelt", type=="inaug", Term==1)%>%select(sent.id, Economy:Legislation)
+speech.df=as.matrix(speech.df)
+speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+            xlab="Sentences", ylab="Topic share", main="FranklinDRoosevelt")
+
+speech.df=tbl_df(corpus.list.df)%>%filter(File=="GeorgeWBush", type=="inaug", Term==1)%>%select(sent.id, Economy:Legislation)
+speech.df=as.matrix(speech.df)
+speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+plot.stacked(speech.df[,1], speech.df[,topic.plot+1], 
+            xlab="Sentences", ylab="Topic share", main="George W Bush")
+
+speech.df=tbl_df(corpus.list.df)%>%filter(File=="BarackObama", type=="inaug", Term==1)%>%select(sent.id, Economy:Legislation)
+speech.df=as.matrix(speech.df)
+speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+            xlab="Sentences", ylab="Topic share", main="Barack Obama")
+
+
+```
+
+We can have a very direct impression about which president focused on which topic more clearly. The key word for President Hoover is "economy". President Roosevelt paid more attention to "freedom" at the early stage of the speech, loved to talk more about "Misc" in the middle of the speech, and discussed "Government" at the end of the speech. President Bush liked talking about "Equality" all the way. President Obama tended to talk "Misc" more.
+
+```{r}
+speech.df=tbl_df(corpus.list.df)%>%filter(type=="nomin", word.count<20)%>%select(sentences, Economy:Legislation)
+
+as.character(speech.df$sentences[apply(as.data.frame(speech.df[,-1]), 2, which.max)])
+
+names(speech.df)[-1]
+
+```
+
+
+```{r, fig.width=3, fig.height=3}
+library(factoextra)
+library(ggplot2)
+presid.summary=tbl_df(corpus.list.df)%>%
+  filter(type=="inaug", File%in%sel.comparison)%>%
+  select(File, Economy:Legislation)%>%
+  group_by(File)%>%
+  summarise_each(funs(mean))
+
+presid.summary=as.data.frame(presid.summary)
+rownames(presid.summary)=as.character((presid.summary[,1]))
+km.res=kmeans(scale(presid.summary[,-1]), iter.max=200,
+              2)
+fviz_cluster(km.res, 
+             stand=T, repel= TRUE,
+             data = presid.summary[,-1],
+             show.clust.cent=FALSE)
+```
+It seems time has a very compelling influence on the inauguration speeches of the presidents. People in the same decades tend to talk about similiar topics. Time change and the culture change, the issues change. Every time has its unique emotion.  
+
+# Step 6: Wordcloud
+```{r}
+folder.path="/Users/wangzhishan/Desktop/applied data science"
+speeches=list.files(path = folder.path, pattern = "*.txt")
+prex.out=substr(speeches, 6, nchar(speeches)-4)
+
+ff.all<-Corpus(DirSource(folder.path))
+```
+
+#wordcloud
+```{r}
+
+folder.path1="/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/data/inaugs"
+folder.path2="/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/data/inaugurals"
+
+speeches1=list.files(path = folder.path1, pattern = "*.txt")
+prex.out1=substr(speeches1, 6, nchar(speeches1)-4)
+
+ff.all1<-Corpus(DirSource(folder.path1))
+
+speeches2=list.files(path = folder.path2, pattern = "*.txt")
+prex.out2=substr(speeches2, 6, nchar(speeches2)-4)
+
+ff.all2<-Corpus(DirSource(folder.path2))
+
+```
+
+```{r}
+
+ff.all1<-tm_map(ff.all1, stripWhitespace)
+ff.all1<-tm_map(ff.all1, content_transformer(tolower))
+ff.all1<-tm_map(ff.all1, PlainTextDocument)
+ff.all1<-tm_map(ff.all1, removeWords, stopwords("english"))
+ff.all1<-tm_map(ff.all1, removeWords, character(0))
+ff.all1<-tm_map(ff.all1, removePunctuation)
+
+ff.all2<-tm_map(ff.all2, stripWhitespace)
+ff.all2<-tm_map(ff.all2, content_transformer(tolower))
+ff.all2<-tm_map(ff.all2, PlainTextDocument)
+ff.all2<-tm_map(ff.all2, removeWords, stopwords("english"))
+ff.all2<-tm_map(ff.all2, removeWords, character(0))
+ff.all2<-tm_map(ff.all2, removePunctuation)
+
+tdm.all1<-TermDocumentMatrix(ff.all1)
+tdm.all2<-TermDocumentMatrix(ff.all2)
+
+tdm.tidy1=tidy(tdm.all1)
+tdm.tidy2=tidy(tdm.all2)
+
+tdm.overall1=summarise(group_by(tdm.tidy1, term), sum(count))
+tdm.overall2=summarise(group_by(tdm.tidy2, term), sum(count))
+```
+
+
+```{r, fig.height=4, fig.width=6}
+
+
+wordcloud(tdm.overall1$term, tdm.overall1$`sum(count)`,
+          scale=c(5,0.5),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Greens"))
+
+wordcloud(tdm.overall2$term, tdm.overall2$`sum(count)`,
+          scale=c(5,0.5),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Greens"))
+```
+
+It seems the word cloud of the four presidents during the financial problems is highly similiar to the rest of the presidents. This shows the common of the inaugurals of the United States. The inauguration speech usually marks the beginning of the president term of office. Without exception, the new president all choose to consolidate confidence and strengthen cooperation, to embark a new great journey.
+
+# Step 7: Summary
+The function of inaugural addresses is precisely to express those cultural features of American politics, political scientists and others have long noted, such transient features of American politics as the incoming president's policy agenda. The inauguration speeched of four presidents have some in common with the others, while also have some unique parts. 
+First, we try to analyze the speeches from the length of the sentences. And in short sentences, we get a glimpse of the time.
+Next, from sentiment analysis, we find the unique emotions during the economic collapse and the common emotions of all time.
+In the topic modeling, the topics link presidential inaugural addresses together as one tradition. We do clustering of topics and find the topic tend to be influenced by the time a lot.
+Finally we perform a wordcloud to get a direct comparision of the speeches we selected and the whole speeches. In general, they are pretty similiar. The more important factor is that certain features of American politics seem so permanent and pervasive. 

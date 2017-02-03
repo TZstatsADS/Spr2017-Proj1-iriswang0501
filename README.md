@@ -1,27 +1,31 @@
 # Spring 2017
-# Project 1: What did the presidents say at their inauguation?
+# Project 1: What did the presidents say at their inauguration?
 
-![image](figs/title.jpg)
+
 
 ### [Project Description](doc/)
 This is the first and only *individual* (as opposed to *team*) this semester. 
 
 Term: Spring 2017
 
-+ Projec title: Lorem ipsum dolor sit amet
-+ This project is conducted by [your name]
++ Project title: The inauguration speeches during the Great Depression and the 2007-2008 financial crisis
++ This project is conducted by Zhishan Wang(zw2362)
 
-+ Project summary: [a short summary] Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
++ Project summary: The Great Depression (1929-39) was the deepest and longest-lasting economic downturn in the history of the Western industrialized world.  In the United States, the Great Depression began soon after the stock market crash of October 1929, which sent Wall Street into a panic and wiped out millions of investors.
+The financial crisis of 2007?2008, also known as the global financial crisis and the 2008 financial crisis, is considered by many economists to have been the worst financial crisis since the Great Depression of the 1930s. 
+In this project we try to use text mining to analyze the inaugurations of these four presidents, to feel the different emotions in the speech and try to find the reflect of the time in the inaugurations
 
-Following [suggestions](http://nicercode.github.io/blog/2013-04-05-projects/) by [RICH FITZJOHN](http://nicercode.github.io/about/#Team) (@richfitz). This folder is orgarnized as follows.
+Following [suggestions](http://nicercode.github.io/blog/2013-04-05-projects/) by [RICH FITZJOHN](http://nicercode.github.io/about/#Team) (@richfitz). 
+
+This folder is organized as follows.
 
 ```
 proj/
-├── lib/
-├── data/
-├── doc/
-├── figs/
-└── output/
+��lib/
+data/
+doc/
+figs/
+output/
 ```
 
-Please see each subfolder for a README file.
+
