@@ -19,13 +19,13 @@ Following [suggestions](http://nicercode.github.io/blog/2013-04-05-projects/) by
 
 This folder is organized as follows.
 
-```
-proj/
+/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501
+
 ”€lib/
 data/
 doc/
 figs/
 output/
-```
+
 
 
