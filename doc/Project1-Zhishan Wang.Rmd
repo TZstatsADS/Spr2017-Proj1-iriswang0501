@@ -22,8 +22,6 @@ In this project we try to use text mining to analyze the inaugurations of these 
 
 ```{r, message=FALSE, warning=FALSE}
 
-setwd("/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/doc")
-getwd()
 packages.used=c("rvest", "tibble", "qdap", 
                 "sentimentr", "gplots", "dplyr",
                 "tm", "syuzhet", "factoextra", 
@@ -64,11 +62,6 @@ library("wordcloud")
 source("../lib/plotstacked.R")
 source("../lib/speechFuncs.R")
 ```
-This notebook was prepared with the following environmental settings.
-
-```{r}
-print(R.version)
-```
 
 # Step 1: Data harvest: scrap speech URLs from <http://www.presidency.ucsb.edu/>.
 
@@ -88,7 +81,7 @@ inaug=inaug[-nrow(inaug),] # remove the last line, irrelevant due to error.
 # Step 2: Using speech metadata posted on <http://www.presidency.ucsb.edu/>, we prepared CSV data sets for the speeches we will scrap. 
 
 ```{r}
-inaug.list=read.csv("/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/data/inauglist.csv", stringsAsFactors = FALSE)
+inaug.list=read.csv("../data/inauglist.csv", stringsAsFactors = FALSE)
 ```
 
 We assemble all scrapped speeches into one list. Note here that we don't have the full text yet, only the links to full text transcripts. 
@@ -115,7 +108,7 @@ for(i in seq(nrow(speech.list))) {
     html_text() # get the text
   speech.list$fulltext[i]=text
   # Create the file name
-  filename <- paste0("/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/data/fulltext/", 
+  filename <- paste0("../data/fulltext/", 
                      speech.list$type[i],
                      speech.list$File[i], "-", 
                      speech.list$Term[i], ".txt")
@@ -453,15 +446,15 @@ ldaOut <-LDA(dtm, k, method="Gibbs", control=list(nstart=nstart,
 #docs to topics
 ldaOut.topics <- as.matrix(topics(ldaOut))
 table(c(1:k, ldaOut.topics))
-write.csv(ldaOut.topics,file=paste("/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/out/LDAGibbs",k,"DocsToTopics.csv"))
+write.csv(ldaOut.topics,file=paste("../out/LDAGibbs",k,"DocsToTopics.csv"))
 
 #top 6 terms in each topic
 ldaOut.terms <- as.matrix(terms(ldaOut,20))
-write.csv(ldaOut.terms,file=paste("/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/out/LDAGibbs",k,"TopicsToTerms.csv"))
+write.csv(ldaOut.terms,file=paste("../out/LDAGibbs",k,"TopicsToTerms.csv"))
 
 #probabilities associated with each topic assignment
 topicProbabilities <- as.data.frame(ldaOut@gamma)
-write.csv(topicProbabilities,file=paste("/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/out/LDAGibbs",k,"TopicProbabilities.csv"))
+write.csv(topicProbabilities,file=paste("../out/LDAGibbs",k,"TopicProbabilities.csv"))
 ```
 ```{r}
 terms.beta=ldaOut@beta
@@ -591,7 +584,7 @@ It seems time has a very compelling influence on the inauguration speeches of th
 
 # Step 6: Wordcloud
 ```{r}
-folder.path="/Users/wangzhishan/Desktop/applied data science"
+folder.path="../.."
 speeches=list.files(path = folder.path, pattern = "*.txt")
 prex.out=substr(speeches, 6, nchar(speeches)-4)
 
@@ -601,8 +594,8 @@ ff.all<-Corpus(DirSource(folder.path))
 #wordcloud
 ```{r}
 
-folder.path1="/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/data/inaugs"
-folder.path2="/Users/wangzhishan/Desktop/Spr2017-Proj1-iriswang0501/data/inaugurals"
+folder.path1="../data/inaugs"
+folder.path2="../data/inaugurals"
 
 speeches1=list.files(path = folder.path1, pattern = "*.txt")
 prex.out1=substr(speeches1, 6, nchar(speeches1)-4)
